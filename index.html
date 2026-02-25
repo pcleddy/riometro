@@ -85,6 +85,11 @@
   .empty .sub { font-size: 13px; margin-top: 4px; }
 
   .footer { text-align: center; font-size: 11px; color: #d1d5db; margin-top: 24px; }
+
+  /* Reset Button */
+  .reset-btn { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid #e5e7eb; color: #9ca3af; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .reset-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #ef4444; }
+  .reset-btn svg { width: 13px; height: 13px; }
 </style>
 </head>
 <body>
@@ -209,7 +214,14 @@
       </div>
     </template>
 
-    <div class="footer">Schedule effective October 7, 2024</div>
+    <div class="footer">
+      Schedule effective October 7, 2024
+      <br>
+      <button class="reset-btn" @click="resetAll">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 119 9"/><path d="M3 3v9h9"/></svg>
+        Start Over
+      </button>
+    </div>
   </div>
 </div>
 
@@ -243,17 +255,34 @@ function fmtWait(mins) {
   return m>0 ? h+'h '+m+'m' : h+'h';
 }
 
-const {createApp, ref, computed, onMounted, onUnmounted} = Vue;
+const STORAGE_KEY = 'railrunner_prefs';
+const DEFAULTS = { station:'Downtown ABQ', direction:'northbound', useCustomTime:false, customTimeStr:'08:00', customDay:'weekday' };
+
+function loadPrefs() {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? {...DEFAULTS, ...JSON.parse(s)} : {...DEFAULTS}; }
+  catch(e) { return {...DEFAULTS}; }
+}
+function savePrefs(obj) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); } catch(e) {}
+}
+
+const {createApp, ref, computed, watch, onMounted, onUnmounted} = Vue;
 
 createApp({
   setup() {
-    const station = ref('Downtown ABQ');
-    const direction = ref('northbound');
-    const useCustomTime = ref(false);
-    const customTimeStr = ref('08:00');
-    const customDay = ref('weekday');
+    const prefs = loadPrefs();
+    const station = ref(prefs.station);
+    const direction = ref(prefs.direction);
+    const useCustomTime = ref(prefs.useCustomTime);
+    const customTimeStr = ref(prefs.customTimeStr);
+    const customDay = ref(prefs.customDay);
     const now = ref(new Date());
     let timer = null;
+
+    // Save to localStorage on any change
+    watch([station, direction, useCustomTime, customTimeStr, customDay], () => {
+      savePrefs({ station:station.value, direction:direction.value, useCustomTime:useCustomTime.value, customTimeStr:customTimeStr.value, customDay:customDay.value });
+    });
 
     onMounted(() => { timer = setInterval(() => now.value = new Date(), 30000); });
     onUnmounted(() => clearInterval(timer));
@@ -320,12 +349,20 @@ createApp({
 
     function formatTimeDisplay(s) { return s.replace('A',' AM').replace('P',' PM'); }
     function formatWait(m) { return fmtWait(m); }
+    function resetAll() {
+      station.value = DEFAULTS.station;
+      direction.value = DEFAULTS.direction;
+      useCustomTime.value = DEFAULTS.useCustomTime;
+      customTimeStr.value = DEFAULTS.customTimeStr;
+      customDay.value = DEFAULTS.customDay;
+      localStorage.removeItem(STORAGE_KEY);
+    }
 
     return {
       station, direction, useCustomTime, customTimeStr, customDay,
       stations: SCHEDULE.stations, zoneMap: ZONE_MAP,
       timeDisplay, dayLabel, dayType, trains, upcoming, later,
-      formatTimeDisplay, formatWait
+      formatTimeDisplay, formatWait, resetAll
     };
   }
 }).mount('#app');
