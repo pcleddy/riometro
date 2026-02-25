@@ -344,8 +344,8 @@ createApp({
       return results;
     });
 
-    const upcoming = computed(() => trains.value.filter(t=>t.wait<=180));
-    const later = computed(() => trains.value.filter(t=>t.wait>180));
+    const upcoming = computed(() => trains.value.slice(0, 3));
+    const later = computed(() => trains.value.slice(3));
 
     function formatTimeDisplay(s) { return s.replace('A',' AM').replace('P',' PM'); }
     function formatWait(m) { return fmtWait(m); }
