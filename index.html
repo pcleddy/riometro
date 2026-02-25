@@ -86,6 +86,12 @@
 
   .footer { text-align: center; font-size: 11px; color: #d1d5db; margin-top: 24px; }
 
+  /* Destination info on train cards */
+  .train-dest { font-size: 11px; color: #6b7280; margin-top: 3px; display: flex; align-items: center; gap: 4px; }
+  .train-dest svg { width: 12px; height: 12px; flex-shrink: 0; }
+  .duration-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 8px; margin-top: 4px; }
+  .no-dest-stop { opacity: 0.45; }
+
   /* Reset Button */
   .reset-btn { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid #e5e7eb; color: #9ca3af; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
   .reset-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #ef4444; }
@@ -122,6 +128,14 @@
       <div class="card-label">Your Station</div>
       <select v-model="station">
         <option v-for="s in stations" :key="s" :value="s">{{ s }} (Zone {{ zoneMap[s] + 1 }})</option>
+      </select>
+    </div>
+
+    <!-- Destination Picker -->
+    <div class="card">
+      <div class="card-label">Destination</div>
+      <select v-model="destination">
+        <option v-for="s in destStations" :key="s" :value="s">{{ s }} (Zone {{ zoneMap[s] + 1 }})</option>
       </select>
     </div>
 
@@ -170,7 +184,7 @@
       <div v-if="upcoming.length > 0">
         <div class="section-label">Next Departures</div>
         <div v-for="(t, i) in upcoming" :key="t.train"
-             class="train-card" :class="i === 0 ? (direction === 'northbound' ? 'next-north' : 'next-south') : ''">
+             class="train-card" :class="[i === 0 ? (direction === 'northbound' ? 'next-north' : 'next-south') : '', !t.destTime ? 'no-dest-stop' : '']">
           <div class="train-left">
             <div class="train-num" :class="i === 0 ? (direction === 'northbound' ? 'next-north' : 'next-south') : 'default'">
               {{ t.train.replace('#','') }}
@@ -182,6 +196,13 @@
                 <span v-if="t.type === 'friday_only'" class="type-badge friday">Fri Only</span>
               </div>
               <div class="train-id">Train {{ t.train }}</div>
+              <div v-if="t.destTime" class="train-dest">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                Arrive {{ formatTimeDisplay(t.destTime) }} · {{ formatWait(t.duration) }} trip
+              </div>
+              <div v-else-if="station !== destination" class="train-dest" style="color:#d97706">
+                Skips {{ destination }}
+              </div>
             </div>
           </div>
           <div class="train-right">
@@ -195,7 +216,8 @@
 
       <div v-if="later.length > 0">
         <div class="section-label">Later Today</div>
-        <div v-for="t in later" :key="t.train" class="train-card">
+        <div v-for="t in later" :key="t.train"
+             class="train-card" :class="!t.destTime ? 'no-dest-stop' : ''">
           <div class="train-left">
             <div class="train-num default">{{ t.train.replace('#','') }}</div>
             <div>
@@ -205,6 +227,13 @@
                 <span v-if="t.type === 'friday_only'" class="type-badge friday">Fri Only</span>
               </div>
               <div class="train-id">Train {{ t.train }}</div>
+              <div v-if="t.destTime" class="train-dest">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                Arrive {{ formatTimeDisplay(t.destTime) }} · {{ formatWait(t.duration) }} trip
+              </div>
+              <div v-else-if="station !== destination" class="train-dest" style="color:#d97706">
+                Skips {{ destination }}
+              </div>
             </div>
           </div>
           <div class="train-right">
@@ -256,7 +285,7 @@ function fmtWait(mins) {
 }
 
 const STORAGE_KEY = 'railrunner_prefs';
-const DEFAULTS = { station:'Downtown ABQ', direction:'northbound', useCustomTime:false, customTimeStr:'08:00', customDay:'weekday' };
+const DEFAULTS = { station:'Downtown ABQ', destination:'Santa Fe Depot', direction:'northbound', useCustomTime:false, customTimeStr:'08:00', customDay:'weekday' };
 
 function loadPrefs() {
   try { const s = localStorage.getItem(STORAGE_KEY); return s ? {...DEFAULTS, ...JSON.parse(s)} : {...DEFAULTS}; }
@@ -272,6 +301,7 @@ createApp({
   setup() {
     const prefs = loadPrefs();
     const station = ref(prefs.station);
+    const destination = ref(prefs.destination);
     const direction = ref(prefs.direction);
     const useCustomTime = ref(prefs.useCustomTime);
     const customTimeStr = ref(prefs.customTimeStr);
@@ -279,9 +309,29 @@ createApp({
     const now = ref(new Date());
     let timer = null;
 
+    const stationIndex = (s) => SCHEDULE.stations.indexOf(s);
+
+    // Filter destination stations based on direction relative to origin
+    const destStations = computed(() => {
+      const si = stationIndex(station.value);
+      if (direction.value === 'northbound') {
+        return SCHEDULE.stations.filter((s, i) => i > si);
+      } else {
+        return SCHEDULE.stations.filter((s, i) => i < si);
+      }
+    });
+
+    // Auto-correct destination when direction or station changes
+    watch([station, direction], () => {
+      const valid = destStations.value;
+      if (valid.length > 0 && !valid.includes(destination.value)) {
+        destination.value = direction.value === 'northbound' ? valid[valid.length - 1] : valid[0];
+      }
+    });
+
     // Save to localStorage on any change
-    watch([station, direction, useCustomTime, customTimeStr, customDay], () => {
-      savePrefs({ station:station.value, direction:direction.value, useCustomTime:useCustomTime.value, customTimeStr:customTimeStr.value, customDay:customDay.value });
+    watch([station, destination, direction, useCustomTime, customTimeStr, customDay], () => {
+      savePrefs({ station:station.value, destination:destination.value, direction:direction.value, useCustomTime:useCustomTime.value, customTimeStr:customTimeStr.value, customDay:customDay.value });
     });
 
     onMounted(() => { timer = setInterval(() => now.value = new Date(), 30000); });
@@ -329,6 +379,7 @@ createApp({
       else sets = SCHEDULE.weekend.sunday[dir]?.trains||[];
 
       const cm = currentMinutes.value;
+      const dest = destination.value;
       const results = [];
       for (const t of sets) {
         if (t.type==='friday_only' && !isFriday.value) continue;
@@ -338,7 +389,15 @@ createApp({
         if (dep===null) continue;
         let wait = dep - cm;
         if (wait < 0) wait += 1440;
-        results.push({train:t.train, type:t.type, time:ts, wait});
+        // Destination lookup
+        const ds = t.stops[dest];
+        const destDep = parseTime(ds);
+        let duration = null;
+        if (dep !== null && destDep !== null) {
+          duration = destDep - dep;
+          if (duration < 0) duration += 1440;
+        }
+        results.push({train:t.train, type:t.type, time:ts, wait, destTime:ds||null, duration});
       }
       results.sort((a,b)=>a.wait-b.wait);
       return results;
@@ -351,6 +410,7 @@ createApp({
     function formatWait(m) { return fmtWait(m); }
     function resetAll() {
       station.value = DEFAULTS.station;
+      destination.value = DEFAULTS.destination;
       direction.value = DEFAULTS.direction;
       useCustomTime.value = DEFAULTS.useCustomTime;
       customTimeStr.value = DEFAULTS.customTimeStr;
@@ -359,8 +419,8 @@ createApp({
     }
 
     return {
-      station, direction, useCustomTime, customTimeStr, customDay,
-      stations: SCHEDULE.stations, zoneMap: ZONE_MAP,
+      station, destination, direction, useCustomTime, customTimeStr, customDay,
+      stations: SCHEDULE.stations, destStations, zoneMap: ZONE_MAP,
       timeDisplay, dayLabel, dayType, trains, upcoming, later,
       formatTimeDisplay, formatWait, resetAll
     };
