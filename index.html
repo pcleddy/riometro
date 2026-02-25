@@ -92,6 +92,24 @@
   .duration-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 8px; margin-top: 4px; }
   .no-dest-stop { opacity: 0.45; }
 
+  /* Swap / Reverse Trip Button */
+  .swap-row { display: flex; justify-content: center; margin: -4px 0; position: relative; z-index: 1; }
+  .swap-btn { display: flex; align-items: center; gap: 5px; background: #fff; border: 1px solid #e5e7eb; color: #6b7280; padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .swap-btn:hover { background: #f0f9ff; border-color: var(--sky-border); color: var(--sky); }
+  .swap-btn svg { width: 14px; height: 14px; }
+
+  /* Full Schedule Toggle */
+  .full-sched-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; color: #6b7280; padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin-top: 12px; }
+  .full-sched-btn:hover { background: #f3f4f6; color: #374151; }
+  .full-sched-btn svg { width: 14px; height: 14px; transition: transform 0.2s; }
+  .full-sched-btn.open svg { transform: rotate(180deg); }
+  .full-sched-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  .full-sched-table th { text-align: left; font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+  .full-sched-table td { padding: 8px; border-bottom: 1px solid #f3f4f6; }
+  .full-sched-table tr:last-child td { border-bottom: none; }
+  .full-sched-table .fs-train { font-weight: 600; color: #374151; }
+  .full-sched-table .fs-skip { color: #d1d5db; }
+
   /* Reset Button */
   .reset-btn { display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid #e5e7eb; color: #9ca3af; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
   .reset-btn:hover { background: #fef2f2; border-color: #fca5a5; color: #ef4444; }
@@ -129,6 +147,14 @@
       <select v-model="station">
         <option v-for="s in stations" :key="s" :value="s">{{ s }} (Zone {{ zoneMap[s] + 1 }})</option>
       </select>
+    </div>
+
+    <!-- Swap Button -->
+    <div class="swap-row">
+      <button class="swap-btn" @click="reverseTrip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+        Reverse Trip
+      </button>
     </div>
 
     <!-- Destination Picker -->
@@ -214,32 +240,41 @@
         </div>
       </div>
 
-      <div v-if="later.length > 0">
-        <div class="section-label">Later Today</div>
-        <div v-for="t in later" :key="t.train"
-             class="train-card" :class="!t.destTime ? 'no-dest-stop' : ''">
-          <div class="train-left">
-            <div class="train-num default">{{ t.train.replace('#','') }}</div>
-            <div>
-              <div class="train-meta">
-                <span class="train-time">{{ formatTimeDisplay(t.time) }}</span>
-                <span v-if="t.type === 'express'" class="type-badge express">Express</span>
-                <span v-if="t.type === 'friday_only'" class="type-badge friday">Fri Only</span>
-              </div>
-              <div class="train-id">Train {{ t.train }}</div>
-              <div v-if="t.destTime" class="train-dest">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                Arrive {{ formatTimeDisplay(t.destTime) }} · {{ formatWait(t.duration) }} trip
-              </div>
-              <div v-else-if="station !== destination" class="train-dest" style="color:#d97706">
-                Skips {{ destination }}
-              </div>
-            </div>
-          </div>
-          <div class="train-right">
-            <div class="wait-time later">{{ formatWait(t.wait) }}</div>
-          </div>
-        </div>
+      <!-- Full Schedule Toggle -->
+      <button class="full-sched-btn" :class="{ open: showFullSchedule }" @click="showFullSchedule = !showFullSchedule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        {{ showFullSchedule ? 'Hide' : 'Full' }} Schedule ({{ trains.length }} trains)
+      </button>
+
+      <div v-if="showFullSchedule" class="card" style="margin-top:8px; padding:12px">
+        <table class="full-sched-table">
+          <thead>
+            <tr>
+              <th>Train</th>
+              <th>Departs</th>
+              <th>Arrives</th>
+              <th>Trip</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in trains" :key="t.train" :style="!t.destTime && station !== destination ? 'opacity:0.4' : ''">
+              <td class="fs-train">
+                {{ t.train.replace('#','') }}
+                <span v-if="t.type === 'express'" class="type-badge express" style="margin-left:4px">Exp</span>
+                <span v-if="t.type === 'friday_only'" class="type-badge friday" style="margin-left:4px">Fri</span>
+              </td>
+              <td>{{ formatTimeDisplay(t.time) }}</td>
+              <td>
+                <span v-if="t.destTime">{{ formatTimeDisplay(t.destTime) }}</span>
+                <span v-else class="fs-skip">—</span>
+              </td>
+              <td>
+                <span v-if="t.duration !== null">{{ formatWait(t.duration) }}</span>
+                <span v-else class="fs-skip">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </template>
 
@@ -404,7 +439,20 @@ createApp({
     });
 
     const upcoming = computed(() => trains.value.slice(0, 3));
-    const later = computed(() => trains.value.slice(3));
+    const showFullSchedule = ref(false);
+
+    function reverseTrip() {
+      const oldStation = station.value;
+      const oldDest = destination.value;
+      direction.value = direction.value === 'northbound' ? 'southbound' : 'northbound';
+      // After direction flips, destStations recomputes. Set the new values:
+      // Use nextTick-style approach — Vue batches, so set after direction change propagates
+      setTimeout(() => {
+        station.value = oldDest;
+        destination.value = oldStation;
+      }, 0);
+      showFullSchedule.value = false;
+    }
 
     function formatTimeDisplay(s) { return s.replace('A',' AM').replace('P',' PM'); }
     function formatWait(m) { return fmtWait(m); }
@@ -420,9 +468,10 @@ createApp({
 
     return {
       station, destination, direction, useCustomTime, customTimeStr, customDay,
+      showFullSchedule,
       stations: SCHEDULE.stations, destStations, zoneMap: ZONE_MAP,
-      timeDisplay, dayLabel, dayType, trains, upcoming, later,
-      formatTimeDisplay, formatWait, resetAll
+      timeDisplay, dayLabel, dayType, trains, upcoming,
+      formatTimeDisplay, formatWait, reverseTrip, resetAll
     };
   }
 }).mount('#app');
