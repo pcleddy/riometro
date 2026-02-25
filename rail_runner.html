@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rail Runner Schedule</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+  :root {
+    --orange: #f97316; --orange-light: #fff7ed; --orange-border: #fdba74;
+    --sky: #0ea5e9; --sky-light: #f0f9ff; --sky-border: #7dd3fc;
+    --green: #16a34a; --amber-bg: #fef3c7; --amber-text: #92400e; --amber-border: #fcd34d;
+    --purple-bg: #f3e8ff; --purple-text: #6b21a8; --purple-border: #c084fc;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #f0f9ff 0%, #fff 40%, #fff7ed 100%); min-height: 100vh; color: #1f2937; }
+  .container { max-width: 480px; margin: 0 auto; padding: 24px 16px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, var(--orange), #eab308); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(249,115,22,0.3); }
+  .logo svg { width: 24px; height: 24px; }
+  .header-text h1 { font-size: 20px; font-weight: 700; }
+  .header-text p { font-size: 11px; color: #9ca3af; }
+
+  .time-badges { display: flex; gap: 8px; margin: 12px 0 20px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; background: #fff; padding: 5px 12px; border-radius: 20px; font-size: 13px; color: #6b7280; border: 1px solid #f3f4f6; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .badge svg { width: 14px; height: 14px; }
+
+  /* Station Picker */
+  .card { background: #fff; border-radius: 16px; border: 1px solid #f3f4f6; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .card-label { font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  select { width: 100%; padding: 12px; border-radius: 12px; background: #f9fafb; border: 1px solid #e5e7eb; font-size: 15px; font-weight: 500; color: #1f2937; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; }
+  select:focus { outline: none; box-shadow: 0 0 0 2px var(--orange); border-color: transparent; }
+
+  /* Direction Toggle */
+  .dir-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .dir-btn { flex: 1; padding: 12px; border-radius: 12px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
+  .dir-btn.active-north { background: var(--orange); color: #fff; box-shadow: 0 4px 12px rgba(249,115,22,0.3); }
+  .dir-btn.active-south { background: var(--sky); color: #fff; box-shadow: 0 4px 12px rgba(14,165,233,0.3); }
+  .dir-btn.inactive { background: #fff; color: #9ca3af; border: 1px solid #e5e7eb; }
+  .dir-btn.inactive:hover { background: #f9fafb; }
+
+  /* Custom Time */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .toggle { position: relative; width: 44px; height: 24px; border-radius: 12px; cursor: pointer; transition: background 0.2s; border: none; }
+  .toggle.on { background: var(--orange); }
+  .toggle.off { background: #d1d5db; }
+  .toggle-knob { position: absolute; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: left 0.2s; }
+  .toggle.off .toggle-knob { left: 2px; }
+  .toggle.on .toggle-knob { left: 22px; }
+  .custom-fields { display: flex; gap: 12px; margin-top: 12px; }
+  .custom-fields > div { flex: 1; }
+  .custom-fields label { display: block; font-size: 11px; color: #9ca3af; margin-bottom: 4px; }
+  .custom-fields input, .custom-fields select { width: 100%; padding: 8px; border-radius: 8px; background: #f9fafb; border: 1px solid #e5e7eb; font-size: 13px; }
+  .custom-fields input:focus, .custom-fields select:focus { outline: none; box-shadow: 0 0 0 2px var(--orange); border-color: transparent; }
+
+  /* Train Cards */
+  .section-label { font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 4px 10px; }
+  .train-card { background: #fff; border-radius: 12px; border: 1px solid #f3f4f6; padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+  .train-card.next-north { border-color: var(--orange-border); box-shadow: 0 4px 12px rgba(249,115,22,0.1); outline: 1px solid rgba(249,115,22,0.15); }
+  .train-card.next-south { border-color: var(--sky-border); box-shadow: 0 4px 12px rgba(14,165,233,0.1); outline: 1px solid rgba(14,165,233,0.15); }
+  .train-left { display: flex; align-items: center; gap: 12px; }
+  .train-num { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+  .train-num.next-north { background: linear-gradient(135deg, var(--orange), #ea580c); color: #fff; }
+  .train-num.next-south { background: linear-gradient(135deg, var(--sky), #0284c7); color: #fff; }
+  .train-num.default { background: #f3f4f6; color: #6b7280; }
+  .train-time { font-weight: 600; color: #1f2937; font-size: 15px; }
+  .train-id { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+  .train-meta { display: flex; align-items: center; gap: 6px; }
+  .type-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .type-badge.express { background: var(--amber-bg); color: var(--amber-text); border: 1px solid var(--amber-border); }
+  .type-badge.friday { background: var(--purple-bg); color: var(--purple-text); border: 1px solid var(--purple-border); }
+  .train-right { text-align: right; }
+  .wait-time { font-size: 18px; font-weight: 700; }
+  .wait-time.soon { color: var(--green); }
+  .wait-time.next-orange { color: var(--orange); }
+  .wait-time.later { color: #9ca3af; }
+  .arriving-label { font-size: 11px; color: var(--green); font-weight: 500; }
+
+  /* Empty State */
+  .empty { text-align: center; padding: 40px 16px; }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty p { color: #9ca3af; }
+  .empty .sub { font-size: 13px; margin-top: 4px; }
+
+  .footer { text-align: center; font-size: 11px; color: #d1d5db; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+          <path d="M4 15h16M4 15l2 4h12l2-4M6 15V9a2 2 0 012-2h8a2 2 0 012 2v6M9 11h0M15 11h0"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1>Rail Runner</h1>
+        <p>New Mexico Express</p>
+      </div>
+    </div>
+
+    <div class="time-badges">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        {{ timeDisplay }}
+      </span>
+      <span class="badge" style="text-transform:capitalize">{{ dayLabel }}</span>
+    </div>
+
+    <!-- Station Picker -->
+    <div class="card">
+      <div class="card-label">Your Station</div>
+      <select v-model="station">
+        <option v-for="s in stations" :key="s" :value="s">{{ s }} (Zone {{ zoneMap[s] + 1 }})</option>
+      </select>
+    </div>
+
+    <!-- Direction -->
+    <div class="dir-toggle">
+      <button class="dir-btn" :class="direction === 'northbound' ? 'active-north' : 'inactive'" @click="direction = 'northbound'">
+        N &uarr; To Santa Fe
+      </button>
+      <button class="dir-btn" :class="direction === 'southbound' ? 'active-south' : 'inactive'" @click="direction = 'southbound'">
+        S &darr; To Belen
+      </button>
+    </div>
+
+    <!-- Custom Time -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="toggle-row">
+        <span class="card-label" style="margin-bottom:0">Custom Time</span>
+        <button class="toggle" :class="useCustomTime ? 'on' : 'off'" @click="useCustomTime = !useCustomTime">
+          <span class="toggle-knob"></span>
+        </button>
+      </div>
+      <div v-if="useCustomTime" class="custom-fields">
+        <div>
+          <label>Time</label>
+          <input type="time" v-model="customTimeStr">
+        </div>
+        <div>
+          <label>Day</label>
+          <select v-model="customDay">
+            <option value="weekday">Weekday</option>
+            <option value="saturday">Saturday</option>
+            <option value="sunday">Sunday</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div v-if="trains.length === 0" class="empty card">
+      <div class="empty-icon">🚂</div>
+      <p><strong>No trains stop here</strong></p>
+      <p class="sub">{{ direction === 'northbound' ? 'Northbound' : 'Southbound' }} on {{ dayType }}s</p>
+    </div>
+
+    <template v-else>
+      <div v-if="upcoming.length > 0">
+        <div class="section-label">Next Departures</div>
+        <div v-for="(t, i) in upcoming" :key="t.train"
+             class="train-card" :class="i === 0 ? (direction === 'northbound' ? 'next-north' : 'next-south') : ''">
+          <div class="train-left">
+            <div class="train-num" :class="i === 0 ? (direction === 'northbound' ? 'next-north' : 'next-south') : 'default'">
+              {{ t.train.replace('#','') }}
+            </div>
+            <div>
+              <div class="train-meta">
+                <span class="train-time">{{ formatTimeDisplay(t.time) }}</span>
+                <span v-if="t.type === 'express'" class="type-badge express">Express</span>
+                <span v-if="t.type === 'friday_only'" class="type-badge friday">Fri Only</span>
+              </div>
+              <div class="train-id">Train {{ t.train }}</div>
+            </div>
+          </div>
+          <div class="train-right">
+            <div class="wait-time" :class="i === 0 ? (t.wait <= 15 ? 'soon' : 'next-orange') : 'later'">
+              {{ formatWait(t.wait) }}
+            </div>
+            <div v-if="i === 0 && t.wait <= 30" class="arriving-label">Arriving soon</div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="later.length > 0">
+        <div class="section-label">Later Today</div>
+        <div v-for="t in later" :key="t.train" class="train-card">
+          <div class="train-left">
+            <div class="train-num default">{{ t.train.replace('#','') }}</div>
+            <div>
+              <div class="train-meta">
+                <span class="train-time">{{ formatTimeDisplay(t.time) }}</span>
+                <span v-if="t.type === 'express'" class="type-badge express">Express</span>
+                <span v-if="t.type === 'friday_only'" class="type-badge friday">Fri Only</span>
+              </div>
+              <div class="train-id">Train {{ t.train }}</div>
+            </div>
+          </div>
+          <div class="train-right">
+            <div class="wait-time later">{{ formatWait(t.wait) }}</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <div class="footer">Schedule effective October 7, 2024</div>
+  </div>
+</div>
+
+<script>
+const SCHEDULE = {"stations":["Belen","Los Lunas","Isleta Pueblo","Bernalillo Co.","Downtown ABQ","Montaño","Los Ranchos / JC","Sandia Pueblo","Downtown Bernalillo","Sandoval Co. / US 550","Kewa","Santa Fe Co. / NM 599","Zia Road","South Capitol","Santa Fe Depot"],"weekday":{"northbound":{"trains":[{"train":"#502","type":"regular","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"4:32A","Montaño":"4:41A","Los Ranchos / JC":"4:47A","Sandia Pueblo":"4:52A","Downtown Bernalillo":"5:01A","Sandoval Co. / US 550":"5:05A","Kewa":"5:25A","Santa Fe Co. / NM 599":"5:48A","Zia Road":"6:03A","South Capitol":"6:13A","Santa Fe Depot":"6:18A"}},{"train":"#504","type":"regular","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"5:02A","Montaño":"5:11A","Los Ranchos / JC":"5:17A","Sandia Pueblo":"5:22A","Downtown Bernalillo":"5:31A","Sandoval Co. / US 550":"5:35A","Kewa":"5:55A","Santa Fe Co. / NM 599":"6:18A","Zia Road":"6:28A","South Capitol":"6:38A","Santa Fe Depot":"6:43A"}},{"train":"#102","type":"express","stops":{"Belen":"5:36A","Los Lunas":"5:46A","Isleta Pueblo":"5:59A","Bernalillo Co.":"6:07A","Downtown ABQ":"6:19A","Montaño":"6:28A","Los Ranchos / JC":"6:34A","Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":"6:46A","Kewa":"7:05A","Santa Fe Co. / NM 599":"7:25A","Zia Road":null,"South Capitol":"7:43A","Santa Fe Depot":"7:48A"}},{"train":"#506","type":"regular","stops":{"Belen":"6:35A","Los Lunas":"6:46A","Isleta Pueblo":"6:59A","Bernalillo Co.":"7:06A","Downtown ABQ":"7:19A","Montaño":"7:29A","Los Ranchos / JC":"7:36A","Sandia Pueblo":"7:42A","Downtown Bernalillo":"7:52A","Sandoval Co. / US 550":"7:56A","Kewa":"8:18A","Santa Fe Co. / NM 599":"8:39A","Zia Road":"8:49A","South Capitol":"8:56A","Santa Fe Depot":"9:01A"}},{"train":"#508","type":"regular","stops":{"Belen":"8:04A","Los Lunas":"8:15A","Isleta Pueblo":"8:27A","Bernalillo Co.":"8:35A","Downtown ABQ":"8:43A","Montaño":null,"Los Ranchos / JC":null,"Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":null,"Kewa":null,"Santa Fe Co. / NM 599":null,"Zia Road":null,"South Capitol":null,"Santa Fe Depot":null}},{"train":"#510","type":"regular","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"9:35A","Montaño":"9:44A","Los Ranchos / JC":"9:50A","Sandia Pueblo":"9:55A","Downtown Bernalillo":"10:03A","Sandoval Co. / US 550":"10:08A","Kewa":"10:28A","Santa Fe Co. / NM 599":"10:51A","Zia Road":"11:01A","South Capitol":"11:11A","Santa Fe Depot":"11:16A"}},{"train":"#512","type":"regular","stops":{"Belen":"9:45A","Los Lunas":"9:56A","Isleta Pueblo":"10:08A","Bernalillo Co.":"10:16A","Downtown ABQ":"10:24A","Montaño":null,"Los Ranchos / JC":null,"Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":null,"Kewa":null,"Santa Fe Co. / NM 599":null,"Zia Road":null,"South Capitol":null,"Santa Fe Depot":null}},{"train":"#514","type":"regular","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"12:24P","Montaño":"12:33P","Los Ranchos / JC":"12:39P","Sandia Pueblo":"12:44P","Downtown Bernalillo":"12:53P","Sandoval Co. / US 550":"12:58P","Kewa":"1:18P","Santa Fe Co. / NM 599":"1:43P","Zia Road":"1:54P","South Capitol":"2:03P","Santa Fe Depot":"2:08P"}},{"train":"#104","type":"express","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"2:19P","Montaño":"2:32P","Los Ranchos / JC":"2:38P","Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":"2:49P","Kewa":"3:09P","Santa Fe Co. / NM 599":"3:29P","Zia Road":null,"South Capitol":"3:47P","Santa Fe Depot":"3:52P"}},{"train":"#516","type":"regular","stops":{"Belen":"3:35P","Los Lunas":"3:46P","Isleta Pueblo":"3:59P","Bernalillo Co.":"4:06P","Downtown ABQ":"4:26P","Montaño":"4:35P","Los Ranchos / JC":"4:41P","Sandia Pueblo":"4:46P","Downtown Bernalillo":"4:54P","Sandoval Co. / US 550":"4:59P","Kewa":"5:19P","Santa Fe Co. / NM 599":"5:43P","Zia Road":"5:55P","South Capitol":"6:02P","Santa Fe Depot":"6:07P"}},{"train":"#518","type":"regular","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"5:34P","Montaño":"5:43P","Los Ranchos / JC":"5:49P","Sandia Pueblo":"5:54P","Downtown Bernalillo":"6:07P","Sandoval Co. / US 550":"6:12P","Kewa":"6:34P","Santa Fe Co. / NM 599":"6:57P","Zia Road":"7:09P","South Capitol":"7:19P","Santa Fe Depot":"7:24P"}},{"train":"#520","type":"regular","stops":{"Belen":"5:51P","Los Lunas":"6:01P","Isleta Pueblo":"6:20P","Bernalillo Co.":"6:29P","Downtown ABQ":"6:48P","Montaño":"6:58P","Los Ranchos / JC":"7:06P","Sandia Pueblo":"7:12P","Downtown Bernalillo":"7:23P","Sandoval Co. / US 550":"7:28P","Kewa":"7:50P","Santa Fe Co. / NM 599":"8:13P","Zia Road":"8:23P","South Capitol":"8:33P","Santa Fe Depot":"8:38P"}},{"train":"#522","type":"regular","stops":{"Belen":"7:01P","Los Lunas":"7:12P","Isleta Pueblo":"7:33P","Bernalillo Co.":"7:41P","Downtown ABQ":"7:50P","Montaño":null,"Los Ranchos / JC":null,"Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":null,"Kewa":null,"Santa Fe Co. / NM 599":null,"Zia Road":null,"South Capitol":null,"Santa Fe Depot":null}},{"train":"#524","type":"friday_only","stops":{"Belen":"8:03P","Los Lunas":"8:14P","Isleta Pueblo":"8:28P","Bernalillo Co.":"8:36P","Downtown ABQ":"8:45P","Montaño":null,"Los Ranchos / JC":null,"Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":null,"Kewa":null,"Santa Fe Co. / NM 599":null,"Zia Road":null,"South Capitol":null,"Santa Fe Depot":null}}]},"southbound":{"trains":[{"train":"#501","type":"regular","stops":{"Santa Fe Depot":null,"South Capitol":null,"Zia Road":null,"Santa Fe Co. / NM 599":null,"Kewa":null,"Sandoval Co. / US 550":null,"Downtown Bernalillo":null,"Sandia Pueblo":null,"Los Ranchos / JC":null,"Montaño":null,"Downtown ABQ":"4:45A","Bernalillo Co.":"4:54A","Isleta Pueblo":"5:01A","Los Lunas":"5:13A","Belen":"5:24A"}},{"train":"#503","type":"regular","stops":{"Santa Fe Depot":null,"South Capitol":null,"Zia Road":null,"Santa Fe Co. / NM 599":null,"Kewa":null,"Sandoval Co. / US 550":null,"Downtown Bernalillo":null,"Sandia Pueblo":null,"Los Ranchos / JC":null,"Montaño":null,"Downtown ABQ":"5:27A","Bernalillo Co.":"5:38A","Isleta Pueblo":"5:46A","Los Lunas":"6:03A","Belen":"6:14A"}},{"train":"#507","type":"regular","stops":{"Santa Fe Depot":"5:39A","South Capitol":"5:44A","Zia Road":"5:51A","Santa Fe Co. / NM 599":"6:01A","Kewa":"6:19A","Sandoval Co. / US 550":"6:38A","Downtown Bernalillo":"6:43A","Sandia Pueblo":"6:52A","Los Ranchos / JC":"6:57A","Montaño":"7:02A","Downtown ABQ":"7:10A","Bernalillo Co.":"7:19A","Isleta Pueblo":"7:27A","Los Lunas":"7:39A","Belen":"7:50A"}},{"train":"#509","type":"regular","stops":{"Santa Fe Depot":"7:08A","South Capitol":"7:13A","Zia Road":"7:20A","Santa Fe Co. / NM 599":"7:37A","Kewa":"7:55A","Sandoval Co. / US 550":"8:14A","Downtown Bernalillo":"8:18A","Sandia Pueblo":"8:27A","Los Ranchos / JC":"8:32A","Montaño":"8:37A","Downtown ABQ":"8:48A","Bernalillo Co.":"8:57A","Isleta Pueblo":"9:04A","Los Lunas":"9:17A","Belen":"9:29A"}},{"train":"#511","type":"regular","stops":{"Santa Fe Depot":"10:11A","South Capitol":"10:17A","Zia Road":"10:23A","Santa Fe Co. / NM 599":"10:35A","Kewa":"10:52A","Sandoval Co. / US 550":"11:11A","Downtown Bernalillo":"11:15A","Sandia Pueblo":"11:24A","Los Ranchos / JC":"11:29A","Montaño":"11:35A","Downtown ABQ":"11:44A","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#513","type":"regular","stops":{"Santa Fe Depot":"1:02P","South Capitol":"1:07P","Zia Road":"1:14P","Santa Fe Co. / NM 599":"1:26P","Kewa":"1:44P","Sandoval Co. / US 550":"2:03P","Downtown Bernalillo":"2:07P","Sandia Pueblo":"2:16P","Los Ranchos / JC":"2:21P","Montaño":"2:26P","Downtown ABQ":"2:42P","Bernalillo Co.":"2:51P","Isleta Pueblo":"2:58P","Los Lunas":"3:11P","Belen":"3:23P"}},{"train":"#515","type":"regular","stops":{"Santa Fe Depot":"2:46P","South Capitol":"2:52P","Zia Road":"3:00P","Santa Fe Co. / NM 599":"3:11P","Kewa":"3:34P","Sandoval Co. / US 550":"3:54P","Downtown Bernalillo":"3:58P","Sandia Pueblo":"4:07P","Los Ranchos / JC":"4:13P","Montaño":"4:19P","Downtown ABQ":"4:43P","Bernalillo Co.":"4:52P","Isleta Pueblo":"4:59P","Los Lunas":"5:12P","Belen":"5:24P"}},{"train":"#517","type":"regular","stops":{"Santa Fe Depot":"4:15P","South Capitol":"4:20P","Zia Road":"4:27P","Santa Fe Co. / NM 599":"4:39P","Kewa":"4:57P","Sandoval Co. / US 550":"5:16P","Downtown Bernalillo":"5:20P","Sandia Pueblo":"5:29P","Los Ranchos / JC":"5:34P","Montaño":"5:39P","Downtown ABQ":"5:50P","Bernalillo Co.":"6:00P","Isleta Pueblo":"6:07P","Los Lunas":"6:23P","Belen":"6:35P"}},{"train":"#101","type":"express","stops":{"Santa Fe Depot":"5:04P","South Capitol":"5:09P","Zia Road":null,"Santa Fe Co. / NM 599":"5:26P","Kewa":null,"Sandoval Co. / US 550":"6:02P","Downtown Bernalillo":null,"Sandia Pueblo":null,"Los Ranchos / JC":"6:16P","Montaño":"6:21P","Downtown ABQ":"6:32P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#519","type":"regular","stops":{"Santa Fe Depot":"5:30P","South Capitol":"5:35P","Zia Road":"5:42P","Santa Fe Co. / NM 599":"5:54P","Kewa":"6:12P","Sandoval Co. / US 550":"6:31P","Downtown Bernalillo":"6:35P","Sandia Pueblo":"6:44P","Los Ranchos / JC":"6:49P","Montaño":"6:54P","Downtown ABQ":"7:03P","Bernalillo Co.":"7:12P","Isleta Pueblo":"7:20P","Los Lunas":"7:34P","Belen":"7:46P"}},{"train":"#521","type":"regular","stops":{"Santa Fe Depot":"6:46P","South Capitol":"6:51P","Zia Road":"6:58P","Santa Fe Co. / NM 599":"7:10P","Kewa":"7:28P","Sandoval Co. / US 550":"7:47P","Downtown Bernalillo":"7:51P","Sandia Pueblo":"8:00P","Los Ranchos / JC":"8:05P","Montaño":"8:10P","Downtown ABQ":"8:18P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#523","type":"regular","stops":{"Santa Fe Depot":"9:00P","South Capitol":"9:05P","Zia Road":"9:12P","Santa Fe Co. / NM 599":"9:24P","Kewa":"9:42P","Sandoval Co. / US 550":"10:01P","Downtown Bernalillo":"10:05P","Sandia Pueblo":"10:14P","Los Ranchos / JC":"10:19P","Montaño":"10:24P","Downtown ABQ":"10:32P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#525","type":"friday_only","stops":{"Santa Fe Depot":"10:05P","South Capitol":"10:10P","Zia Road":"10:17P","Santa Fe Co. / NM 599":"10:29P","Kewa":"10:47P","Sandoval Co. / US 550":"11:06P","Downtown Bernalillo":"11:10P","Sandia Pueblo":"11:19P","Los Ranchos / JC":"11:24P","Montaño":"11:29P","Downtown ABQ":"11:37P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}}]}},"weekend":{"saturday":{"northbound":{"trains":[{"train":"#702","stops":{"Belen":"7:24A","Los Lunas":"7:34A","Isleta Pueblo":"7:45A","Bernalillo Co.":"7:53A","Downtown ABQ":"8:04A","Montaño":"8:13A","Los Ranchos / JC":"8:19A","Sandia Pueblo":"8:24A","Downtown Bernalillo":"8:32A","Sandoval Co. / US 550":"8:36A","Kewa":"8:54A","Santa Fe Co. / NM 599":"9:15A","Zia Road":"9:26A","South Capitol":"9:34A","Santa Fe Depot":"9:39A"}},{"train":"#704","stops":{"Belen":"9:20A","Los Lunas":"9:30A","Isleta Pueblo":"9:41A","Bernalillo Co.":"9:49A","Downtown ABQ":"10:08A","Montaño":"10:17A","Los Ranchos / JC":"10:23A","Sandia Pueblo":"10:28A","Downtown Bernalillo":"10:37A","Sandoval Co. / US 550":"10:41A","Kewa":"11:02A","Santa Fe Co. / NM 599":"11:25A","Zia Road":"11:36A","South Capitol":"11:44A","Santa Fe Depot":"11:50A"}},{"train":"#706","stops":{"Belen":"12:30P","Los Lunas":"12:40P","Isleta Pueblo":"12:51P","Bernalillo Co.":"12:59P","Downtown ABQ":"1:14P","Montaño":"1:23P","Los Ranchos / JC":"1:29P","Sandia Pueblo":"1:34P","Downtown Bernalillo":"1:42P","Sandoval Co. / US 550":"1:46P","Kewa":"2:04P","Santa Fe Co. / NM 599":"2:25P","Zia Road":"2:36P","South Capitol":"2:44P","Santa Fe Depot":"2:49P"}},{"train":"#708","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"3:11P","Montaño":"3:20P","Los Ranchos / JC":"3:26P","Sandia Pueblo":"3:31P","Downtown Bernalillo":"3:40P","Sandoval Co. / US 550":"3:45P","Kewa":"4:10P","Santa Fe Co. / NM 599":"4:31P","Zia Road":"4:42P","South Capitol":"4:50P","Santa Fe Depot":"4:56P"}},{"train":"#710","stops":{"Belen":"5:40P","Los Lunas":"5:50P","Isleta Pueblo":"6:01P","Bernalillo Co.":"6:09P","Downtown ABQ":"6:20P","Montaño":"6:29P","Los Ranchos / JC":"6:35P","Sandia Pueblo":"6:40P","Downtown Bernalillo":"6:48P","Sandoval Co. / US 550":"6:52P","Kewa":"7:10P","Santa Fe Co. / NM 599":"7:31P","Zia Road":"7:42P","South Capitol":"7:50P","Santa Fe Depot":"7:55P"}},{"train":"#712","stops":{"Belen":"7:43P","Los Lunas":"7:53P","Isleta Pueblo":"8:04P","Bernalillo Co.":"8:12P","Downtown ABQ":"8:23P","Montaño":"8:32P","Los Ranchos / JC":"8:38P","Sandia Pueblo":"8:43P","Downtown Bernalillo":"8:51P","Sandoval Co. / US 550":"8:55P","Kewa":null,"Santa Fe Co. / NM 599":"9:34P","Zia Road":"9:45P","South Capitol":"9:53P","Santa Fe Depot":"9:58P"}},{"train":"#714","stops":{"Belen":"10:40P","Los Lunas":"10:50P","Isleta Pueblo":"11:02P","Bernalillo Co.":"11:08P","Downtown ABQ":"11:16P","Montaño":null,"Los Ranchos / JC":null,"Sandia Pueblo":null,"Downtown Bernalillo":null,"Sandoval Co. / US 550":null,"Kewa":null,"Santa Fe Co. / NM 599":null,"Zia Road":null,"South Capitol":null,"Santa Fe Depot":null}}]},"southbound":{"trains":[{"train":"#703","stops":{"Santa Fe Depot":null,"South Capitol":null,"Zia Road":null,"Santa Fe Co. / NM 599":null,"Kewa":null,"Sandoval Co. / US 550":null,"Downtown Bernalillo":null,"Sandia Pueblo":null,"Los Ranchos / JC":null,"Montaño":null,"Downtown ABQ":"8:21A","Bernalillo Co.":"8:31A","Isleta Pueblo":"8:39A","Los Lunas":"8:50A","Belen":"9:00A"}},{"train":"#705","stops":{"Santa Fe Depot":"10:00A","South Capitol":"10:05A","Zia Road":null,"Santa Fe Co. / NM 599":"10:22A","Kewa":"10:40A","Sandoval Co. / US 550":"11:02A","Downtown Bernalillo":"11:05A","Sandia Pueblo":"11:14A","Los Ranchos / JC":"11:19A","Montaño":"11:25A","Downtown ABQ":"11:35A","Bernalillo Co.":"11:45A","Isleta Pueblo":"11:53A","Los Lunas":"12:04P","Belen":"12:14P"}},{"train":"#707","stops":{"Santa Fe Depot":"12:57P","South Capitol":"1:03P","Zia Road":null,"Santa Fe Co. / NM 599":"1:21P","Kewa":"1:40P","Sandoval Co. / US 550":"2:04P","Downtown Bernalillo":"2:08P","Sandia Pueblo":"2:17P","Los Ranchos / JC":"2:23P","Montaño":"2:28P","Downtown ABQ":"2:38P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#709","stops":{"Santa Fe Depot":"3:05P","South Capitol":"3:10P","Zia Road":"3:18P","Santa Fe Co. / NM 599":"3:27P","Kewa":"3:45P","Sandoval Co. / US 550":"4:03P","Downtown Bernalillo":"4:06P","Sandia Pueblo":"4:17P","Los Ranchos / JC":"4:20P","Montaño":"4:26P","Downtown ABQ":"4:36P","Bernalillo Co.":"4:50P","Isleta Pueblo":"5:10P","Los Lunas":"5:20P","Belen":"5:30P"}},{"train":"#711","stops":{"Santa Fe Depot":"5:55P","South Capitol":"6:09P","Zia Road":"6:17P","Santa Fe Co. / NM 599":"6:27P","Kewa":"6:46P","Sandoval Co. / US 550":"7:10P","Downtown Bernalillo":"7:14P","Sandia Pueblo":"7:23P","Los Ranchos / JC":"7:28P","Montaño":"7:34P","Downtown ABQ":"7:44P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#713","stops":{"Santa Fe Depot":"6:03P","South Capitol":"6:09P","Zia Road":"6:17P","Santa Fe Co. / NM 599":"6:27P","Kewa":"6:46P","Sandoval Co. / US 550":"7:10P","Downtown Bernalillo":"7:14P","Sandia Pueblo":"7:23P","Los Ranchos / JC":"7:28P","Montaño":"7:34P","Downtown ABQ":"7:44P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#715","stops":{"Santa Fe Depot":"8:10P","South Capitol":"8:15P","Zia Road":"8:23P","Santa Fe Co. / NM 599":"8:32P","Kewa":"8:50P","Sandoval Co. / US 550":"9:11P","Downtown Bernalillo":"9:16P","Sandia Pueblo":"9:25P","Los Ranchos / JC":"9:30P","Montaño":"9:36P","Downtown ABQ":"9:46P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#717","stops":{"Santa Fe Depot":"10:14P","South Capitol":"10:19P","Zia Road":"10:27P","Santa Fe Co. / NM 599":"10:36P","Kewa":"10:54P","Sandoval Co. / US 550":"11:13P","Downtown Bernalillo":"11:16P","Sandia Pueblo":null,"Los Ranchos / JC":null,"Montaño":"11:36P","Downtown ABQ":"11:45P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":"10:25P","Belen":null}}]}},"sunday":{"northbound":{"trains":[{"train":"#702","stops":{"Belen":"7:24A","Los Lunas":"7:34A","Isleta Pueblo":"7:45A","Bernalillo Co.":"7:53A","Downtown ABQ":"8:04A","Montaño":"8:13A","Los Ranchos / JC":"8:19A","Sandia Pueblo":"8:24A","Downtown Bernalillo":"8:32A","Sandoval Co. / US 550":"8:36A","Kewa":"8:54A","Santa Fe Co. / NM 599":"9:15A","Zia Road":"9:26A","South Capitol":"9:34A","Santa Fe Depot":"9:39A"}},{"train":"#706","stops":{"Belen":"12:30P","Los Lunas":"12:40P","Isleta Pueblo":"12:51P","Bernalillo Co.":"12:59P","Downtown ABQ":"1:14P","Montaño":"1:23P","Los Ranchos / JC":"1:29P","Sandia Pueblo":"1:34P","Downtown Bernalillo":"1:42P","Sandoval Co. / US 550":"1:46P","Kewa":"2:04P","Santa Fe Co. / NM 599":"2:25P","Zia Road":"2:36P","South Capitol":"2:44P","Santa Fe Depot":"2:49P"}},{"train":"#708","stops":{"Belen":null,"Los Lunas":null,"Isleta Pueblo":null,"Bernalillo Co.":null,"Downtown ABQ":"3:11P","Montaño":"3:20P","Los Ranchos / JC":"3:26P","Sandia Pueblo":"3:31P","Downtown Bernalillo":"3:40P","Sandoval Co. / US 550":"3:45P","Kewa":"4:10P","Santa Fe Co. / NM 599":"4:31P","Zia Road":"4:42P","South Capitol":"4:50P","Santa Fe Depot":"4:56P"}},{"train":"#710","stops":{"Belen":"5:40P","Los Lunas":null,"Isleta Pueblo":"6:01P","Bernalillo Co.":"6:09P","Downtown ABQ":"6:20P","Montaño":"6:29P","Los Ranchos / JC":"6:35P","Sandia Pueblo":"6:40P","Downtown Bernalillo":"6:48P","Sandoval Co. / US 550":"6:52P","Kewa":"7:10P","Santa Fe Co. / NM 599":"7:31P","Zia Road":"7:42P","South Capitol":"7:50P","Santa Fe Depot":"7:55P"}}]},"southbound":{"trains":[{"train":"#701","stops":{"Santa Fe Depot":null,"South Capitol":null,"Zia Road":null,"Santa Fe Co. / NM 599":null,"Kewa":null,"Sandoval Co. / US 550":null,"Downtown Bernalillo":null,"Sandia Pueblo":null,"Los Ranchos / JC":null,"Montaño":null,"Downtown ABQ":"6:30A","Bernalillo Co.":"6:40A","Isleta Pueblo":"6:48A","Los Lunas":"6:59A","Belen":"7:09A"}},{"train":"#705","stops":{"Santa Fe Depot":"10:00A","South Capitol":"10:05A","Zia Road":"10:13A","Santa Fe Co. / NM 599":"10:22A","Kewa":"10:40A","Sandoval Co. / US 550":"11:02A","Downtown Bernalillo":"11:05A","Sandia Pueblo":"11:14A","Los Ranchos / JC":"11:19A","Montaño":"11:25A","Downtown ABQ":"11:35A","Bernalillo Co.":"11:45A","Isleta Pueblo":"11:53A","Los Lunas":"12:04P","Belen":"12:14P"}},{"train":"#709","stops":{"Santa Fe Depot":"3:05P","South Capitol":"3:10P","Zia Road":"3:18P","Santa Fe Co. / NM 599":"3:27P","Kewa":"3:45P","Sandoval Co. / US 550":"4:03P","Downtown Bernalillo":"4:06P","Sandia Pueblo":"4:17P","Los Ranchos / JC":"4:20P","Montaño":"4:26P","Downtown ABQ":"4:39P","Bernalillo Co.":"4:50P","Isleta Pueblo":"5:10P","Los Lunas":"5:20P","Belen":"5:30P"}},{"train":"#713","stops":{"Santa Fe Depot":"8:10P","South Capitol":"8:15P","Zia Road":"8:23P","Santa Fe Co. / NM 599":"8:32P","Kewa":"8:50P","Sandoval Co. / US 550":"9:11P","Downtown Bernalillo":"9:16P","Sandia Pueblo":"9:25P","Los Ranchos / JC":"9:30P","Montaño":"9:36P","Downtown ABQ":"9:46P","Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}},{"train":"#719","stops":{"Santa Fe Depot":"8:10P","South Capitol":"8:15P","Zia Road":"8:23P","Santa Fe Co. / NM 599":"8:32P","Kewa":"8:50P","Sandoval Co. / US 550":"9:11P","Downtown Bernalillo":"9:11P","Sandia Pueblo":null,"Los Ranchos / JC":null,"Montaño":null,"Downtown ABQ":null,"Bernalillo Co.":null,"Isleta Pueblo":null,"Los Lunas":null,"Belen":null}}]}}}};
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const ZONE_MAP = {"Belen":4,"Los Lunas":4,"Isleta Pueblo":3,"Bernalillo Co.":3,"Downtown ABQ":2,"Montaño":2,"Los Ranchos / JC":2,"Sandia Pueblo":2,"Downtown Bernalillo":1,"Sandoval Co. / US 550":1,"Kewa":1,"Santa Fe Co. / NM 599":1,"Zia Road":0,"South Capitol":0,"Santa Fe Depot":0};
+
+function parseTime(s) {
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2}):(\d{2})(A|P)$/);
+  if (!m) return null;
+  let h = parseInt(m[1]);
+  const min = parseInt(m[2]);
+  if (m[3]==='P' && h!==12) h+=12;
+  if (m[3]==='A' && h===12) h=0;
+  return h*60+min;
+}
+
+function fmt12(h,m) {
+  const p = h>=12?'PM':'AM';
+  const dh = h%12===0?12:h%12;
+  return dh+':'+String(m).padStart(2,'0')+' '+p;
+}
+
+function fmtWait(mins) {
+  if (mins<1) return 'Now';
+  if (mins<60) return mins+' min';
+  const h=Math.floor(mins/60), m=mins%60;
+  return m>0 ? h+'h '+m+'m' : h+'h';
+}
+
+const {createApp, ref, computed, onMounted, onUnmounted} = Vue;
+
+createApp({
+  setup() {
+    const station = ref('Downtown ABQ');
+    const direction = ref('northbound');
+    const useCustomTime = ref(false);
+    const customTimeStr = ref('08:00');
+    const customDay = ref('weekday');
+    const now = ref(new Date());
+    let timer = null;
+
+    onMounted(() => { timer = setInterval(() => now.value = new Date(), 30000); });
+    onUnmounted(() => clearInterval(timer));
+
+    const currentMinutes = computed(() => {
+      if (useCustomTime.value) {
+        const [h,m] = customTimeStr.value.split(':').map(Number);
+        return h*60+m;
+      }
+      return now.value.getHours()*60+now.value.getMinutes();
+    });
+
+    const dayType = computed(() => {
+      if (useCustomTime.value) return customDay.value;
+      const d = now.value.getDay();
+      if (d===0) return 'sunday';
+      if (d===6) return 'saturday';
+      return 'weekday';
+    });
+
+    const isFriday = computed(() => {
+      if (useCustomTime.value) return customDay.value === 'weekday';
+      return now.value.getDay() === 5;
+    });
+
+    const timeDisplay = computed(() => {
+      if (useCustomTime.value) {
+        const [h,m] = customTimeStr.value.split(':').map(Number);
+        return fmt12(h,m);
+      }
+      return fmt12(now.value.getHours(), now.value.getMinutes());
+    });
+
+    const dayLabel = computed(() => {
+      if (useCustomTime.value) return customDay.value === 'weekday' ? 'Weekday' : customDay.value;
+      return DAYS[now.value.getDay()];
+    });
+
+    const trains = computed(() => {
+      let sets = [];
+      const dt = dayType.value, dir = direction.value;
+      if (dt==='weekday') sets = SCHEDULE.weekday[dir]?.trains||[];
+      else if (dt==='saturday') sets = SCHEDULE.weekend.saturday[dir]?.trains||[];
+      else sets = SCHEDULE.weekend.sunday[dir]?.trains||[];
+
+      const cm = currentMinutes.value;
+      const results = [];
+      for (const t of sets) {
+        if (t.type==='friday_only' && !isFriday.value) continue;
+        const ts = t.stops[station.value];
+        if (!ts) continue;
+        const dep = parseTime(ts);
+        if (dep===null) continue;
+        let wait = dep - cm;
+        if (wait < 0) wait += 1440;
+        results.push({train:t.train, type:t.type, time:ts, wait});
+      }
+      results.sort((a,b)=>a.wait-b.wait);
+      return results;
+    });
+
+    const upcoming = computed(() => trains.value.filter(t=>t.wait<=180));
+    const later = computed(() => trains.value.filter(t=>t.wait>180));
+
+    function formatTimeDisplay(s) { return s.replace('A',' AM').replace('P',' PM'); }
+    function formatWait(m) { return fmtWait(m); }
+
+    return {
+      station, direction, useCustomTime, customTimeStr, customDay,
+      stations: SCHEDULE.stations, zoneMap: ZONE_MAP,
+      timeDisplay, dayLabel, dayType, trains, upcoming, later,
+      formatTimeDisplay, formatWait
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
