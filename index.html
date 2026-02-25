@@ -415,6 +415,7 @@ createApp({
 
       const cm = currentMinutes.value;
       const dest = destination.value;
+      const si = stationIndex(station.value);
       const results = [];
       for (const t of sets) {
         if (t.type==='friday_only' && !isFriday.value) continue;
@@ -422,6 +423,12 @@ createApp({
         if (!ts) continue;
         const dep = parseTime(ts);
         if (dep===null) continue;
+        // Skip trains that don't continue past this station in the chosen direction
+        const beyondStations = dir === 'northbound'
+          ? SCHEDULE.stations.slice(si + 1)
+          : SCHEDULE.stations.slice(0, si);
+        const goesBeyond = beyondStations.some(s => t.stops[s]);
+        if (!goesBeyond) continue;
         let wait = dep - cm;
         if (wait < 0) wait += 1440;
         // Destination lookup
